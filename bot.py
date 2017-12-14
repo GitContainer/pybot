@@ -1,10 +1,13 @@
-import time # noqa
+import time, json # noqa
 from datetime import timedelta, datetime
 from slackclient import SlackClient
 
 
 class Bot(object):
-    """Slack bot class."""
+    """Slack bot class.
+    Handle all basic greeting to member rolling standup, including
+    timeframe of each standup.
+    """
 
     """Attributes."""
     token = None
@@ -59,9 +62,31 @@ class Bot(object):
         self.client.rtm_send_message(channel, "That's it for today \
             Thanks for your effort today")
 
+    def is_bot(self, member):
+        """Check if member is current bot.
+        member: specified member id
+        """
+        return self.login_data['id'] == member
+
+    def exec_member(self, member):
+        """Lopp through every questions, and pass to user.
+        member: interacted member.
+        """
+        timeout = datetime.now() + timedelta(seconds=180)
+        ongoing = True
+        while ongoing and datetime.now() < timeout:
+            for question in self.questions:
+                # ask question
+                # expect answer
+                # check answer
+                # response if needed
+                pass
+        pass
+
     def standup_start(self, channel):
         """Start stand up on channel.
         channel: respective channel
+        TODO: breakdown this method
         """
         report = {}
         report['channel'] = channel
@@ -70,7 +95,7 @@ class Bot(object):
         members = self.get_members(channel)
 
         for member in members:
-            if member == self.login_data['id']:
+            if self.is_bot(member):
                 continue
             # prepare data
             report['members'] = []
@@ -85,7 +110,7 @@ class Bot(object):
             member_time_out = datetime.now() + timedelta(seconds=20)
             while ongoing:
                 if datetime.now() > member_time_out:
-                    data['message'] = None
+                    data['message'] = "timeout"
                     self.client.rtm_send_message(channel, "<@{}> is not available \
                         Let's move to another member.".format(member))
                     break
@@ -100,8 +125,8 @@ class Bot(object):
                         continue
                     if from_channel != channel or user != member:
                         continue
-                    if message == 'skip':
-                        data['message'] = None
+                    if message.lower() == 'skip':
+                        data['message'] = "skiped"
                         self.client.rtm_send_message(
                             from_channel, 'okay')
                         ongoing = False
@@ -132,9 +157,24 @@ class Bot(object):
         response = self.client.api_call("channels.info", channel=channel)
         return response['channel']['members']
 
-    def set_question(self, questions):
+    def set_questions(self, questions):
         """Set question to be asked.
         questions: array of questions
         """
         self.questions = questions
         return self
+
+    def push_question(self, question):
+        """Push question to queue.
+        question: Question object to be pushed.
+        """
+        self.questions.append(question)
+        return self
+
+    def send_report(self, hook):
+        """Send report to hook.
+        hook: endpoint to receive the report
+        """
+        payload = json.dumps(self.reports)
+        print('sending to %s', hook)
+        print(payload)
