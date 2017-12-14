@@ -1,6 +1,6 @@
 from bot import Bot # noqa
 
-BOT_TOKEN = "xoxb-285783436067-4KKnWM3D98gz4jIlCWZUi6eq"
+BOT_TOKEN = "<your token>"
 
 
 def main():
