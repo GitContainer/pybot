@@ -1,4 +1,4 @@
-# SLACK BOT
+# SLACK STANDUP BOT
 
 
 ## Run
