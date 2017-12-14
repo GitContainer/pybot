@@ -68,20 +68,60 @@ class Bot(object):
         """
         return self.login_data['id'] == member
 
-    def exec_member(self, member):
-        """Lopp through every questions, and pass to user.
+    def extract_slack_message(self, message):
+        """Extract slack message body.
+        message: response from slack
+        """
+        text, user, channel = message.get(
+            'text'), message.get(
+            'user'), message.get('channel')
+        if not text or not user or not channel or user == self.login_data['id']:
+            return None
+        return {'user': user, 'text': text, 'channel': channel}
+
+    def exec_member(self, member, channel):
+        """Loop through every questions, and pass to user.
         member: interacted member.
         """
-        timeout = datetime.now() + timedelta(seconds=180)
         ongoing = True
-        while ongoing and datetime.now() < timeout:
-            for question in self.questions:
-                # ask question
-                # expect answer
-                # check answer
-                # response if needed
-                pass
-        pass
+        count = -1
+        data = {}
+        # bot start
+        self.client.rtm_send_message(channel, """
+            Hello <@{}> type `start` to begin,\
+            or `skip` if you want to skip for \
+            today.
+            """.format(member))
+        member_time_out = datetime.now() + timedelta(seconds=20)
+        while ongoing:
+            if datetime.now() > member_time_out:
+                data['message'] = "timeout"
+                self.client.rtm_send_message(channel, "<@{}> is not available \
+                    Let's move to another member.".format(member))
+                break
+            for slack_message in self.client.rtm_read():
+
+                message = self.extract_slack_message(slack_message)
+                if message is None:
+                    continue
+                if message['channel'] != channel or message['user'] != member:
+                    continue
+                if message['text'].lower() == 'skip':
+                    data['message'] = "skipped"
+                    self.client.rtm_send_message(
+                        message['channel'], 'okay')
+                    ongoing = False
+                    break
+                count += 1
+                data['q_' + str(count)] = message['text']
+                if count >= len(self.questions):
+                    ongoing = False
+                    break
+                self.client.rtm_send_message(
+                    message['channel'], self.questions[count])
+        self.client.rtm_send_message(
+            message['channel'], "Thanks <@{}>.".format(member))
+        return data
 
     def standup_start(self, channel):
         """Start stand up on channel.
@@ -90,58 +130,15 @@ class Bot(object):
         """
         report = {}
         report['channel'] = channel
-        report['members'] = {}
+        report['members'] = []
         self.greet(channel)
         members = self.get_members(channel)
 
         for member in members:
             if self.is_bot(member):
                 continue
-            # prepare data
-            report['members'] = []
-            data = {}
-            data['id'] = member
-            ongoing = True
-            count = -1
-            # bot start
-            self.client.rtm_send_message(channel, "Hello <@{}> type `start` \
-                to begin, or `skip` if you want to skip for \
-                today.".format(member))
-            member_time_out = datetime.now() + timedelta(seconds=20)
-            while ongoing:
-                if datetime.now() > member_time_out:
-                    data['message'] = "timeout"
-                    self.client.rtm_send_message(channel, "<@{}> is not available \
-                        Let's move to another member.".format(member))
-                    break
-                for slack_message in self.client.rtm_read():
-
-                    message = slack_message.get("text")
-                    user = slack_message.get("user")
-                    from_channel = slack_message.get("channel")
-                    # Conditional to make sure reply come from right
-                    # member and channel
-                    if not message or not user or user == self.login_data['id']:
-                        continue
-                    if from_channel != channel or user != member:
-                        continue
-                    if message.lower() == 'skip':
-                        data['message'] = "skiped"
-                        self.client.rtm_send_message(
-                            from_channel, 'okay')
-                        ongoing = False
-                        break
-                    count += 1
-                    data['q_' + str(count)] = message
-                    if count >= len(self.questions):
-                        ongoing = False
-                        break
-                    self.client.rtm_send_message(
-                        from_channel, self.questions[count])
-            self.client.rtm_send_message(
-                from_channel, "Thanks <@{}>.".format(member))
-            report['members'].append(data)
-
+            report['members'].append(
+                self.exec_member(member, channel))
         self.farewell(channel)
         return report
 
