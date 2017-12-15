@@ -1,6 +1,12 @@
-import argparse, asyncio, sys # noqa
+import logging, argparse, asyncio, sys # noqa
 from bot import Bot # noqa
 import constants
+
+logging.basicConfig(
+	filename="log.txt",
+	level=logging.DEBUG,
+	format="%(asctime)s:%(levelname)s:%(message)s"
+)
 
 
 def main(args):
@@ -13,11 +19,12 @@ token is required, provide them by --token=xxx,
 or run --help for further information.
 		''')
 		return
-	lady = Bot(args.token, args.timeout)
+	lady = Bot(args.token, args.timeout, args.secret)
 	lady = lady.set_questions(constants.QUESTIONS).set_channels(
 		batches)
 	lady.start()
-	lady.send_report(args.hook)
+	response = lady.send_report(args.hook)
+	logging.info(response)
 
 
 def parse_arguments():
@@ -40,7 +47,11 @@ def parse_arguments():
 		''')
 
 	parser.add_argument('--timeout', type=str, default=constants.PER_PERSON_TIMEOUT, help='''
-		Timeout of each member or questiosn being asked in seconds.
+		Timeout of each member or questions being asked in seconds.
+		''')
+
+	parser.add_argument('--secret', type=str, default="", help='''
+		Secret string for authenticating to hook.
 		''')
 
 	return parser.parse_args()

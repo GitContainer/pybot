@@ -1,4 +1,4 @@
-import time, json, asyncio # noqa
+import logging, time, json, requests # noqa
 import constants
 from datetime import timedelta, datetime
 from slackclient import SlackClient
@@ -18,10 +18,15 @@ class Bot(object):
     login_data = None
     end_time = None
 
-    def __init__(self, token, timeout):
+    def __init__(self, token, timeout, secret=""):
         """Initialize bot instance.
         token: slack bot authorization token
         """
+        self.headers = {
+            "secret": secret,
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
         self.timeout = timeout
         self.token = token
 
@@ -30,7 +35,7 @@ class Bot(object):
         self.client = SlackClient(self.token)
         if self.client.rtm_connect():
             self.login_data = self.client.get_login_data()
-            print("bot running")
+            logging.info("bot running")
             for channel in self.get_all_channels():
                 if channel['name'] in self.channels:
                     self.reports.append(self.standup_start(channel))
@@ -190,5 +195,11 @@ Let's move to another member.".format(member))
         hook: endpoint to receive the report
         """
         payload = json.dumps(self.reports)
-        print('sending to %s'.format(hook))
-        print(payload)
+        try:
+            response = requests.post(
+                hook, headers=self.headers, data=payload
+            )
+            return response
+        except requests.exceptions.RequestException as e:
+            logging.warning(e)
+            return payload
