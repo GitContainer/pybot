@@ -1,2 +1,4 @@
-slackclient
-joblib
+# slackclient [temporary requirements]
+websocket-client
+requests
+six
