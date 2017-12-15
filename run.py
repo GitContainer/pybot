@@ -13,7 +13,7 @@ token is required, provide them by --token=xxx,
 or run --help for further information.
 		''')
 		return
-	lady = Bot(args.token)
+	lady = Bot(args.token, args.timeout)
 	lady = lady.set_questions(constants.QUESTIONS).set_channels(
 		batches)
 	lady.start()
@@ -38,6 +38,11 @@ def parse_arguments():
 	parser.add_argument('--token', type=str, default=None, help='''
 		Your bot token.
 		''')
+
+	parser.add_argument('--timeout', type=str, default=constants.PER_PERSON_TIMEOUT, help='''
+		Timeout of each member or questiosn being asked in seconds.
+		''')
+
 	return parser.parse_args()
 
 if __name__ == '__main__':
