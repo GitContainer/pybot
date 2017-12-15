@@ -18,10 +18,11 @@ class Bot(object):
     login_data = None
     end_time = None
 
-    def __init__(self, token):
+    def __init__(self, token, timeout):
         """Initialize bot instance.
         token: slack bot authorization token
         """
+        self.timeout = timeout
         self.token = token
 
     def start(self):
@@ -32,7 +33,7 @@ class Bot(object):
             print("bot running")
             for channel in self.get_all_channels():
                 if channel['name'] in self.channels:
-                    self.reports.append(self.standup_start(channel['id']))
+                    self.reports.append(self.standup_start(channel))
         return self.reports
 
     def set_channels(self, channels):
@@ -40,13 +41,6 @@ class Bot(object):
         :channels array of channels
         """
         self.channels = channels
-        return self
-
-    def set_timeframe(self, interval=7200):
-        """Set slackbot existence timeframe.
-        :time, time in seconds. Default to 1 hours
-        """
-        self.end_time = datetime.now() + timedelta(seconds=time)
         return self
 
     def greet(self, channel):
@@ -80,6 +74,18 @@ Thanks for your effort today")
             return None
         return {'user': user, 'text': text, 'channel': channel}
 
+    def fetch_user_data(self, member):
+        """Fetch user data from userid.
+        member: userid on slack
+        """
+        response = self.client.api_call("users.info", user=member)
+        result = {
+            'email': response['user']['profile']['email'],
+            'username': response['user']['name'],
+            'real_name': response['user']['real_name']
+        }
+        return result
+
     def exec_member(self, member, channel):
         """Loop through every questions, and pass to user.
         member: interacted member.
@@ -87,6 +93,8 @@ Thanks for your effort today")
         ongoing = True
         count = -1
         data = {}
+        response = {}
+        data['user'] = self.fetch_user_data(member)
         # bot start
         self.client.rtm_send_message(channel, """
 Hello <@{}> type anything to begin,\
@@ -94,10 +102,10 @@ or `skip` if you want to skip for \
 today.
             """.format(member))
         member_time_out = datetime.now() + timedelta(
-            seconds=constants.PER_PERSON_TIMEOUT)
+            seconds=int(self.timeout))
         while ongoing:
             if datetime.now() > member_time_out:
-                data['message'] = "timeout"
+                response['message'] = "timeout"
                 self.client.rtm_send_message(channel, "<@{}> is not available \
 Let's move to another member.".format(member))
                 break
@@ -109,21 +117,27 @@ Let's move to another member.".format(member))
                 if message['channel'] != channel or message['user'] != member:
                     continue
                 if message['text'].lower() == 'skip':
-                    data['message'] = "skipped"
+                    response['message'] = "skipped"
                     self.client.rtm_send_message(
                         message['channel'], 'okay')
                     ongoing = False
                     break
+                elif count < 0 and message['text'].lower() not in constants.POSITIVE:
+                    continue
+                if count >= 0:
+                    response[self.questions[count]] = message['text']
+                else:
+                    response['init'] = message['text']
                 count += 1
-                data['q_' + str(count)] = message['text']
                 if count >= len(self.questions):
                     ongoing = False
                     break
                 # reset timeout variables after each answer
                 member_time_out = datetime.now() + timedelta(
-                    seconds=constants.PER_PERSON_TIMEOUT)
+                    seconds=int(self.timeout))
                 self.client.rtm_send_message(
                     message['channel'], self.questions[count])
+            data['response'] = response
         self.client.rtm_send_message(
             channel, "Thanks <@{}>.".format(member))
         return data
@@ -133,16 +147,16 @@ Let's move to another member.".format(member))
         channel: respective channel
         """
         report = {}
-        report['channel'] = channel
+        report['channel'] = channel['name']
         report['members'] = []
-        self.greet(channel)
-        members = self.get_members(channel)
+        self.greet(channel['id'])
+        members = self.get_members(channel['id'])
         for member in members:
             if self.is_bot(member):
                 continue
-            member_report = self.exec_member(member, channel)
+            member_report = self.exec_member(member, channel['id'])
             report['members'].append(member_report)
-        self.farewell(channel)
+        self.farewell(channel['id'])
         return report
 
     def get_all_channels(self):
@@ -176,5 +190,5 @@ Let's move to another member.".format(member))
         hook: endpoint to receive the report
         """
         payload = json.dumps(self.reports)
-        print('sending to %s', hook)
+        print('sending to %s'.format(hook))
         print(payload)
