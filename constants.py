@@ -9,8 +9,8 @@ QUESTIONS = [
 
 DEFAULT_CHANNEL = 'general'
 
-BOT_TOKEN = 'xoxb-285783436067-4KKnWM3D98gz4jIlCWZUi6eq'
-
+# BOT_TOKEN = 'xoxb-285783436067-4KKnWM3D98gz4jIlCWZUi6eq'
+BOT_TOKEN = 'xoxb-285783436067-aVFd8wEnkrmO4cR8v19wOrWU'
 DEFAULT_HOOK = 'localhost:8081/retrieve-standup'
 
 BASE_DESCRIPTION = '''
@@ -18,6 +18,10 @@ Lady-bot a python slack standup bot, schedule this script from your system.
 Currently running on synchronous manner for each channel,
 will be improved later.
 '''
+
+POSITIVE = [
+	'yes', 'ya', 'yea', 'yeah', 'okay', 'ok', 'go', 'sap ndan'
+]
 
 CREATOR = 'andy-shi88'
 
