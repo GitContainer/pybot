@@ -1,3 +1,11 @@
+*.pyc
+*.pyo
+*.db
+
+# pycache
+__pycache__
+
+
 # virtual environment
 env/
 env/*
