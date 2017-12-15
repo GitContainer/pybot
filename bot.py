@@ -1,4 +1,5 @@
-import time, json # noqa
+import time, json, asyncio # noqa
+import constants
 from datetime import timedelta, datetime
 from slackclient import SlackClient
 
@@ -32,7 +33,7 @@ class Bot(object):
             for channel in self.get_all_channels():
                 if channel['name'] in self.channels:
                     self.reports.append(self.standup_start(channel['id']))
-            print(self.reports)
+        return self.reports
 
     def set_channels(self, channels):
         """Pass list of channel to execute standup.
@@ -53,14 +54,14 @@ class Bot(object):
         channel: target channel name
         """
         self.client.rtm_send_message(channel, "Hello, We'll start the stand up \
-            soon.")
+soon.")
 
     def farewell(self, channel):
         """Sum up the standups.
         channel: target channel name
         """
-        self.client.rtm_send_message(channel, "That's it for today \
-            Thanks for your effort today")
+        self.client.rtm_send_message(channel, "Looks like that's it for today \
+Thanks for your effort today")
 
     def is_bot(self, member):
         """Check if member is current bot.
@@ -88,19 +89,20 @@ class Bot(object):
         data = {}
         # bot start
         self.client.rtm_send_message(channel, """
-            Hello <@{}> type `start` to begin,\
-            or `skip` if you want to skip for \
-            today.
+Hello <@{}> type anything to begin,\
+or `skip` if you want to skip for \
+today.
             """.format(member))
-        member_time_out = datetime.now() + timedelta(seconds=20)
+        member_time_out = datetime.now() + timedelta(
+            seconds=constants.PER_PERSON_TIMEOUT)
         while ongoing:
             if datetime.now() > member_time_out:
                 data['message'] = "timeout"
                 self.client.rtm_send_message(channel, "<@{}> is not available \
-                    Let's move to another member.".format(member))
+Let's move to another member.".format(member))
                 break
             for slack_message in self.client.rtm_read():
-
+                # Start listening for message
                 message = self.extract_slack_message(slack_message)
                 if message is None:
                     continue
@@ -117,28 +119,29 @@ class Bot(object):
                 if count >= len(self.questions):
                     ongoing = False
                     break
+                # reset timeout variables after each answer
+                member_time_out = datetime.now() + timedelta(
+                    seconds=constants.PER_PERSON_TIMEOUT)
                 self.client.rtm_send_message(
                     message['channel'], self.questions[count])
         self.client.rtm_send_message(
-            message['channel'], "Thanks <@{}>.".format(member))
+            channel, "Thanks <@{}>.".format(member))
         return data
 
     def standup_start(self, channel):
         """Start stand up on channel.
         channel: respective channel
-        TODO: breakdown this method
         """
         report = {}
         report['channel'] = channel
         report['members'] = []
         self.greet(channel)
         members = self.get_members(channel)
-
         for member in members:
             if self.is_bot(member):
                 continue
-            report['members'].append(
-                self.exec_member(member, channel))
+            member_report = self.exec_member(member, channel)
+            report['members'].append(member_report)
         self.farewell(channel)
         return report
 
