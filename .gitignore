@@ -9,3 +9,5 @@ __pycache__
 # virtual environment
 env/
 env/*
+
+log.txt
